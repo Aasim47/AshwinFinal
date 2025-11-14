@@ -9,9 +9,19 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.81.1",
+    "google-tts-api": "^2.0.2",
+    "leaflet": "^1.9.4",
+    "leaflet.heat": "^0.2.0",
+    "localforage": "^1.10.0",
     "next": "16.0.3",
     "react": "19.2.0",
-    "react-dom": "19.2.0"
+    "react-dom": "19.2.0",
+    "react-leaflet": "^5.0.0",
+    "react-leaflet-markercluster": "^5.0.0-rc.0",
+    "react-toastify": "^11.0.5",
+    "recharts": "^3.4.1",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

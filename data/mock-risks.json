@@ -1,0 +1,22 @@
+[
+  {
+    "id": "mock-1",
+    "village": "Karanpur",
+    "lat": 21.1458,
+    "lng": 81.9036,
+    "risk_score": 6,
+    "risk_level": "madhyam",
+    "summary": "Cluster of fever and vomiting. 6 cases in last 48h.",
+    "last_updated": "2025-11-14T00:00:00Z"
+  },
+  {
+    "id": "mock-2",
+    "village": "Naya Tola",
+    "lat": 21.1800,
+    "lng": 81.9200,
+    "risk_score": 3,
+    "risk_level": "kam",
+    "summary": "Single fever case, under observation.",
+    "last_updated": "2025-11-13T20:00:00Z"
+  }
+]
