@@ -1,30 +1,50 @@
-import { NextResponse } from "next/server";
+// app/api/doctor/add-note/route.ts
+import { NextRequest, NextResponse } from "next/server";
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { case_id, author, note, followup_ts } = body;
-    if (!case_id || !author || !note) return NextResponse.json({ ok: false, error: "missing" }, { status: 400 });
+    const { case_id, author = "unknown", note } = body;
 
-    const SUPA_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY!; // server-only
+    if (!case_id || !note) {
+      return NextResponse.json({ ok: false, error: "missing case_id or note" }, { status: 400 });
+    }
 
-    const res = await fetch(`${SUPA_URL}/rest/v1/case_notes`, {
-      method: "POST",
-      headers: {
-        "apikey": SERVICE_ROLE,
-        "Authorization": `Bearer ${SERVICE_ROLE}`,
-        "Content-Type": "application/json",
-        "Prefer": "return=representation"
-      },
-      body: JSON.stringify([{ case_id, author, note, followup_ts }])
+    const SUPA_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const SUPA_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY; // server key
+
+    if (!SUPA_URL || !SUPA_KEY) {
+      return NextResponse.json({ ok: false, error: "supabase not configured" }, { status: 500 });
+    }
+
+    const { createClient } = await import("@supabase/supabase-js");
+    const supabase = createClient(SUPA_URL, SUPA_KEY);
+
+    // Insert note
+    const { data: noteRow, error: noteErr } = await supabase
+      .from("case_notes")
+      .insert({ case_id, author, note })
+      .select()
+      .single();
+
+    if (noteErr) {
+      console.error("note insert error", noteErr);
+      return NextResponse.json({ ok: false, error: "db_insert_failed", detail: noteErr.message }, { status: 500 });
+    }
+
+    // Also insert an event row into case_events for audit
+    const evMeta = { author, note };
+    const { error: evErr } = await supabase.from("case_events").insert({
+      case_id,
+      event_type: "note",
+      meta: evMeta
     });
 
-    const json = await res.json();
-    if (!res.ok) return NextResponse.json({ ok: false, detail: json }, { status: 500 });
+    if (evErr) console.warn("case_events insert warning", evErr);
 
-    return NextResponse.json({ ok: true, note: json[0] });
+    return NextResponse.json({ ok: true, note: noteRow });
   } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: 500 });
+    console.error("add-note error", e);
+    return NextResponse.json({ ok: false, error: "server_error", detail: String(e) }, { status: 500 });
   }
 }

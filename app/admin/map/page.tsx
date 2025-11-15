@@ -70,6 +70,15 @@ type BroadcastRow = {
   created_at?: string;
 };
 
+// --- ICONS (SVG) for UI Enhancement ---
+const Icons = {
+  Search: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>,
+  Close: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
+  Play: () => <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>,
+  Broadcast: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" /></svg>,
+  Refresh: () => <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+};
+
 // AutoCenter component (uses react-leaflet useMap)
 function AutoCenter({ lat, lng }: { lat: number; lng: number }) {
   const map = useMap();
@@ -82,14 +91,32 @@ function AutoCenter({ lat, lng }: { lat: number; lng: number }) {
   return null;
 }
 
-// BroadcastModal component (paste into admin page file, above default export or inside it but before return)
-function BroadcastModal({ onSent }: { onSent?: (b: any) => void }) {
-  const [open, setOpen] = useState(false);
+// BroadcastModal component (REFACTORED to be controlled)
+function BroadcastModalContent({ 
+  open, 
+  onClose, 
+  onSent 
+}: { 
+  open: boolean; 
+  onClose: () => void; 
+  onSent?: (b: any) => void 
+}) {
   const [message, setMessage] = useState("");
   const [severity, setSeverity] = useState<"kam" | "madhyam" | "zyaada">("madhyam");
   const [lat, setLat] = useState<string>("");
   const [lng, setLng] = useState<string>("");
   const [radius, setRadius] = useState<number | "">("");
+
+  // Reset fields when opening
+  useEffect(() => {
+    if (open) {
+      setMessage("");
+      setSeverity("madhyam");
+      setLat("");
+      setLng("");
+      setRadius("");
+    }
+  }, [open]);
 
   async function sendBroadcast() {
     if (!message || message.trim().length < 3) {
@@ -117,56 +144,82 @@ function BroadcastModal({ onSent }: { onSent?: (b: any) => void }) {
         return;
       }
       // feedback
-      setMessage("");
-      setLat("");
-      setLng("");
-      setRadius("");
-      setSeverity("madhyam");
-      setOpen(false);
-      alert("Broadcast sent.");
+      onClose(); // Use callback
+      toast.success("Broadcast sent.");
       if (onSent) onSent(json.broadcast || json);
     } catch (e: any) {
       console.error("broadcast error", e);
-      alert("Broadcast failed: " + e?.message || e);
+      alert("Broadcast failed: " + (e?.message || e));
     }
   }
 
+  if (!open) return null; // Render nothing if not open
+
   return (
-    <>
-      <button onClick={() => setOpen(true)} className="ml-2 text-sm px-3 py-1 bg-rose-600 text-white rounded">Send Broadcast</button>
+    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-slate-200 overflow-hidden">
+        {/* Modal Header */}
+        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+          <div>
+             <h3 className="text-lg font-bold text-slate-800">Emergency Broadcast</h3>
+             <p className="text-xs text-slate-500">Send alert to users in the field</p>
+          </div>
+          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition">
+            <Icons.Close />
+          </button>
+        </div>
 
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded p-4 w-full max-w-md">
-            <h3 className="text-lg font-semibold mb-2">Emergency Broadcast</h3>
+        {/* Modal Body */}
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1 uppercase tracking-wider">Message</label>
+            <textarea 
+              value={message} 
+              onChange={(e)=>setMessage(e.target.value)} 
+              placeholder="Type your alert message here (Hindi/English)..." 
+              className="w-full border border-slate-300 rounded-lg p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all placeholder:text-slate-400" 
+              rows={4} 
+            />
+          </div>
 
-            <div className="space-y-2">
-              <textarea value={message} onChange={(e)=>setMessage(e.target.value)} placeholder="Enter broadcast message (Hindi/English)" className="w-full border rounded p-2" rows={4} />
-              <div className="flex gap-2">
-                <label className="text-xs">Severity</label>
-                <select value={severity} onChange={(e)=> setSeverity(e.target.value as any)} className="ml-2 border rounded px-2 py-1 text-sm">
-                  <option value="kam">Low</option>
-                  <option value="madhyam">Medium</option>
-                  <option value="zyaada">High</option>
-                </select>
-              </div>
-
-              <div className="text-xs text-slate-600">Optional geofence (center + radius in meters). Leave blank to broadcast to all.</div>
-              <div className="grid grid-cols-3 gap-2">
-                <input value={lat} onChange={(e)=>setLat(e.target.value)} placeholder="lat" className="border rounded px-2 py-1 text-sm" />
-                <input value={lng} onChange={(e)=>setLng(e.target.value)} placeholder="lng" className="border rounded px-2 py-1 text-sm" />
-                <input value={radius as any} onChange={(e)=>setRadius(e.target.value === "" ? "" : Number(e.target.value))} placeholder="radius (m)" className="border rounded px-2 py-1 text-sm" />
-              </div>
-
-              <div className="flex gap-2 justify-end mt-3">
-                <button onClick={() => setOpen(false)} className="px-3 py-1 border rounded">Cancel</button>
-                <button onClick={sendBroadcast} className="px-3 py-1 bg-rose-600 text-white rounded">Send</button>
-              </div>
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="flex-1">
+               <label className="block text-xs font-semibold text-slate-700 mb-1 uppercase tracking-wider">Severity Level</label>
+               <select 
+                 value={severity} 
+                 onChange={(e)=> setSeverity(e.target.value as any)} 
+                 className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+               >
+                <option value="kam">Low Priority</option>
+                <option value="madhyam">Medium Priority</option>
+                <option value="zyaada">High Priority</option>
+               </select>
+            </div>
+            <div className="text-xs text-slate-400 pb-2">
+                Define urgency level for recipients.
             </div>
           </div>
+
+          <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
+             <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-slate-600 uppercase">Geofence (Optional)</span>
+                <span className="text-[10px] text-slate-400 bg-white px-2 py-0.5 rounded border">Lat/Lng + Radius</span>
+             </div>
+             <div className="grid grid-cols-3 gap-3">
+                <input value={lat} onChange={(e)=>setLat(e.target.value)} placeholder="Latitude" className="border border-slate-300 rounded-md px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+                <input value={lng} onChange={(e)=>setLng(e.target.value)} placeholder="Longitude" className="border border-slate-300 rounded-md px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+                <input value={radius as any} onChange={(e)=>setRadius(e.target.value === "" ? "" : Number(e.target.value))} placeholder="Radius (m)" className="border border-slate-300 rounded-md px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+             </div>
+          </div>
         </div>
-      )}
-    </>
+
+        {/* Modal Footer */}
+        <div className="bg-slate-50 px-6 py-4 border-t border-slate-100 flex gap-3 justify-end">
+          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 rounded-lg transition">Cancel</button>
+          <button onClick={sendBroadcast} className="px-5 py-2 text-sm font-medium bg-rose-600 text-white rounded-lg shadow-md hover:bg-rose-700 hover:shadow-lg transition-all">Send Alert</button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -200,6 +253,9 @@ export default function AdminMapPage(): JSX.Element {
   const [clusterOn, setClusterOn] = useState(true);
   const [tileTheme, setTileTheme] = useState<"day" | "night">("day");
   const [search, setSearch] = useState("");
+
+  // *** FIX: Modal state lifted to parent ***
+  const [broadcastModalOpen, setBroadcastModalOpen] = useState(false);
 
   const mapRef = useRef<any>(null);
   const heatLayerRef = useRef<any>(null);
@@ -480,8 +536,12 @@ export default function AdminMapPage(): JSX.Element {
       summary: c.summary_hindi ?? c.symptoms,
       created_at: c.created_at,
     }));
+    if (rows.length === 0) {
+      toast.info("No cases to export");
+      return;
+    }
     const csv = [
-      Object.keys(rows[0] || {}).join(","),
+      Object.keys(rows[0]).join(","),
       ...rows.map((r) => Object.values(r).map((v) => `"${String(v ?? "")}"`).join(",")),
     ].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -530,7 +590,7 @@ export default function AdminMapPage(): JSX.Element {
       const R = require("recharts");
       const { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } = R;
       return (
-        <div style={{ width: "100%", height: 160 }}>
+        <div style={{ width: "100%", height: 140 }}>
           <ResponsiveContainer>
             <AreaChart data={data}>
               <defs>
@@ -540,9 +600,12 @@ export default function AdminMapPage(): JSX.Element {
                 </linearGradient>
               </defs>
               <XAxis dataKey="time" hide />
-              <YAxis allowDecimals={false} />
-              <Tooltip />
-              <Area type="monotone" dataKey="count" stroke="#8884d8" fillOpacity={1} fill="url(#colorCount)" />
+              <YAxis allowDecimals={false} hide />
+              <Tooltip 
+                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                itemStyle={{ color: '#4f46e5', fontSize: '12px', fontWeight: 600 }}
+              />
+              <Area type="monotone" dataKey="count" stroke="#8884d8" strokeWidth={2} fillOpacity={1} fill="url(#colorCount)" />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -550,235 +613,333 @@ export default function AdminMapPage(): JSX.Element {
     };
   }
 
+  // small helper to pan-to-case from list
+  function panToCase(c: CaseRow) {
+    const lat = c.extra?.lat ?? pseudoLocationFromString(c.chid)[0];
+    const lng = c.extra?.lng ?? pseudoLocationFromString(c.chid)[1];
+    if (mapRef.current) {
+      try {
+        mapRef.current.flyTo([lat, lng], 13, { duration: 0.8 });
+      } catch {}
+    }
+  }
+
+  // UI Components for internal usage
+  const StatBadge = ({ label, value, color = "bg-slate-100 text-slate-700" }: { label: string, value: string | number, color?: string }) => (
+    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border border-transparent ${color}`}>
+      <span className="opacity-70">{label}</span>
+      <span className="font-bold text-sm">{value}</span>
+    </div>
+  );
+
   // render
   return (
-    <div className="min-h-screen p-4 bg-slate-50">
-      <ToastContainer position="top-right" autoClose={3500} />
-      <div className="max-w-6xl mx-auto">
-        {/* error */}
-        {error && <div className="mb-4 p-3 rounded bg-red-50 text-red-700 border border-red-100">{error}</div>}
-
-        <header className="flex items-center gap-4 mb-4">
-          <h1 className="text-2xl font-semibold">Admin — Live Map (Pro)</h1>
-          <div className="text-sm text-slate-600">Realtime cases + risk simulation</div>
-
-          <div className="ml-4 text-xs text-slate-600">Cases: <strong>{caseCount}</strong> | Risks: <strong>{riskCount}</strong> | Broadcasts: <strong>{broadcasts.length}</strong></div>
-
-          {/* filter */}
-          <div className="ml-4">
-            <label className="text-xs text-slate-600 mr-2">Filter:</label>
-            <select value={filter} onChange={(e) => setFilter(e.target.value as any)} className="text-sm border rounded px-2 py-1">
-              <option value="all">All</option>
-              <option value="kam">Low</option>
-              <option value="madhyam">Medium</option>
-              <option value="zyaada">High</option>
-            </select>
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-rose-100 selection:text-rose-900">
+      <ToastContainer position="bottom-right" autoClose={3500} toastClassName="rounded-lg shadow-lg font-sans text-sm" />
+      
+      {/* *** FIX: Render modal at root level, outside of sticky header *** */}
+      <BroadcastModalContent
+        open={broadcastModalOpen}
+        onClose={() => setBroadcastModalOpen(false)}
+        onSent={(b) => {
+          setBroadcasts((prev) => [b, ...prev].slice(0, 200));
+          toast.success("Broadcast queued/sent.");
+          setBroadcastModalOpen(false); // Close on sent
+        }}
+      />
+      
+      {/* Floating Header */}
+      <header className="sticky top-0 z-[500] bg-white/80 backdrop-blur-md border-b border-slate-200 shadow-sm px-6 py-3">
+        <div className="max-w-[1600px] mx-auto flex items-center justify-between gap-4">
+          
+          {/* Brand + Title */}
+          <div className="flex items-center gap-4">
+            <div className="bg-gradient-to-br from-rose-500 to-pink-600 w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold shadow-md shadow-rose-200">
+              <span className="text-lg">H</span>
+            </div>
+            <div className="flex flex-col leading-none">
+              <h1 className="text-lg font-bold text-slate-800 tracking-tight">Admin Command Center</h1>
+              <div className="text-xs text-slate-500 font-medium mt-1">Real-time Surveillance & Response</div>
+            </div>
           </div>
 
-          {/* search */}
-          <div className="ml-4 flex items-center">
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search CHID/village/notes" className="text-sm border px-2 py-1 rounded" />
-            <button onClick={() => { setSearch(""); }} className="ml-2 text-xs px-2 py-1 border rounded">Clear</button>
+          {/* Center Stats */}
+          <div className="hidden md:flex items-center gap-3 bg-slate-50/50 p-1 rounded-full border border-slate-100">
+             <StatBadge label="Total Cases" value={caseCount} color="bg-white text-slate-700 shadow-sm border-slate-200" />
+             <StatBadge label="Active Risks" value={riskCount} color="bg-white text-slate-700 shadow-sm border-slate-200" />
+             <StatBadge label="Broadcasts" value={broadcasts.length} color="bg-white text-slate-700 shadow-sm border-slate-200" />
           </div>
 
-          {/* auto refresh */}
-          <button onClick={() => setAutoRefresh((v) => !v)} className={`ml-4 text-sm px-3 py-1 rounded ${autoRefresh ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
-            {autoRefresh ? "Stop Auto Refresh" : "Start Auto Refresh"}
-          </button>
-
-          {/* tile theme */}
-          <button onClick={() => setTileTheme(tileTheme === "day" ? "night" : "day")} className="ml-4 text-sm px-3 py-1 border rounded">
-            Theme: {tileTheme}
-          </button>
-
-          {/* heat toggle */}
-          <button onClick={() => setHeatOn((v) => !v)} className={`ml-4 text-sm px-3 py-1 rounded ${heatOn ? "bg-yellow-100 text-yellow-700" : "bg-slate-100 text-slate-700"}`}>
-            {heatOn ? "Hide Heatmap" : "Show Heatmap"}
-          </button>
-
-          {/* clustering toggle */}
-          <button onClick={() => setClusterOn((v) => !v)} className="ml-4 text-sm px-3 py-1 border rounded">
-            Clustering: {clusterOn ? "On" : "Off"}
-          </button>
-
-          {/* Send Broadcast Button */}
-          <BroadcastModal onSent={(b) => {
-            // push broadcast locally so admin sees it immediately
-            setBroadcasts((prev) => [b, ...prev].slice(0, 200));
-            toast.success("Broadcast queued/sent.");
-          }} />
-
-          {/* admin dropdown */}
-          <div className="ml-auto relative">
-            <details className="relative">
-              <summary className="cursor-pointer px-3 py-1 border rounded">Admin</summary>
-              <div className="absolute right-0 mt-2 w-48 bg-white border rounded shadow p-2 z-40">
-                <button onClick={clearMapView} className="w-full text-left px-2 py-1 text-sm">Clear map view</button>
-                <button onClick={exportCSV} className="w-full text-left px-2 py-1 text-sm">Export CSV</button>
-                <button onClick={jumpToLatest} className="w-full text-left px-2 py-1 text-sm">Jump to latest</button>
-                <button onClick={() => setShowPlayLatest((s) => !s)} className="w-full text-left px-2 py-1 text-sm">{showPlayLatest ? "Hide Play Button" : "Show Play Button"}</button>
+          {/* Right Controls */}
+          <div className="flex items-center gap-3">
+            {/* Search */}
+            <div className="relative group">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 group-focus-within:text-rose-500 transition-colors">
+                <Icons.Search />
               </div>
-            </details>
+              <input 
+                value={search} 
+                onChange={(e) => setSearch(e.target.value)} 
+                placeholder="Search CHID, village..." 
+                className="pl-9 pr-8 py-1.5 w-48 text-sm bg-slate-100 border border-transparent rounded-full focus:bg-white focus:border-rose-500 focus:ring-2 focus:ring-rose-100 outline-none transition-all placeholder:text-slate-400" 
+              />
+              {search && (
+                <button onClick={() => setSearch("")} className="absolute inset-y-0 right-0 pr-2 flex items-center text-slate-400 hover:text-slate-600">
+                  <Icons.Close />
+                </button>
+              )}
+            </div>
+
+            <div className="h-8 w-px bg-slate-200 mx-1"></div>
+
+            {/* Toggles */}
+            <button onClick={() => setAutoRefresh((v) => !v)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${autoRefresh ? "bg-green-50 text-green-700 border border-green-200" : "bg-slate-100 text-slate-500"}`}>
+               {autoRefresh && <span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span></span>}
+               {!autoRefresh && <Icons.Refresh />}
+               {autoRefresh ? "Live" : "Paused"}
+            </button>
+
+            <div className="flex bg-slate-100 p-1 rounded-lg">
+               <button onClick={() => setTileTheme(tileTheme === "day" ? "night" : "day")} className="px-2 py-1 text-xs font-medium text-slate-600 hover:bg-white hover:shadow-sm rounded transition">
+                 {tileTheme === "day" ? "☀️" : "🌙"}
+               </button>
+               <button onClick={() => setHeatOn((v) => !v)} className={`px-2 py-1 text-xs font-medium rounded transition ${heatOn ? "bg-white shadow-sm text-orange-600" : "text-slate-600 hover:bg-white/50"}`}>
+                 🔥
+               </button>
+               <button onClick={() => setClusterOn((v) => !v)} className={`px-2 py-1 text-xs font-medium rounded transition ${clusterOn ? "bg-white shadow-sm text-indigo-600" : "text-slate-600 hover:bg-white/50"}`}>
+                 ●●
+               </button>
+            </div>
+
+            {/* *** FIX: Replaced modal component with a trigger button *** */}
+            <button 
+              onClick={() => setBroadcastModalOpen(true)} 
+              className="flex items-center gap-2 ml-2 text-sm font-medium px-4 py-2 bg-rose-600 text-white rounded-lg shadow-sm hover:bg-rose-700 hover:shadow-md transition-all active:scale-95"
+            >
+              <Icons.Broadcast />
+              <span>Send Broadcast</span>
+            </button>
+            
+            {/* Admin Menu Dropdown */}
+             <details className="relative group">
+                <summary className="list-none cursor-pointer">
+                  <div className="w-9 h-9 bg-slate-200 rounded-full flex items-center justify-center hover:bg-slate-300 transition text-slate-600 font-bold text-xs">AD</div>
+                </summary>
+                <div className="absolute right-0 mt-2 w-48 bg-white border border-slate-100 rounded-xl shadow-xl p-1 z-[600] animate-in fade-in zoom-in-95 duration-100 origin-top-right">
+                  <div className="px-3 py-2 text-[10px] uppercase font-bold text-slate-400 tracking-wider border-b border-slate-50 mb-1">Actions</div>
+                  <button onClick={jumpToLatest} className="w-full text-left px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 rounded-lg transition">📍 Jump to latest case</button>
+                  <button onClick={exportCSV} className="w-full text-left px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 rounded-lg transition">📄 Export Data (CSV)</button>
+                  <button onClick={() => setShowPlayLatest((s) => !s)} className="w-full text-left px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 rounded-lg transition">{showPlayLatest ? "🔇 Hide Auto-Play" : "🔊 Show Auto-Play"}</button>
+                  <div className="h-px bg-slate-100 my-1"></div>
+                  <button onClick={clearMapView} className="w-full text-left px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg transition">🗑️ Clear Map View</button>
+                </div>
+              </details>
           </div>
-        </header>
+        </div>
+      </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="md:col-span-2 bg-white rounded shadow p-2 relative">
-            {loading && <div className="absolute z-10 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white/80 p-3 rounded shadow">Loading map data…</div>}
+      <div className="max-w-[1600px] mx-auto p-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-120px)] min-h-[600px]">
+          
+          {/* Left Column: Map (Flexible width) */}
+          <div className="lg:col-span-9 flex flex-col gap-4 h-full relative group">
+            <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden h-full relative">
+              {loading && (
+                 <div className="absolute inset-0 z-[400] bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center text-slate-500">
+                    <div className="w-8 h-8 border-4 border-rose-500 border-t-transparent rounded-full animate-spin mb-2"></div>
+                    <div className="text-sm font-medium">Loading intelligence map...</div>
+                 </div>
+              )}
+              
+              {/* Map Container */}
+              {isClient ? (
+                <MapContainerAny whenCreated={onMapCreated} center={center} zoom={11} style={{ height: "100%", width: "100%" }} className="z-0">
+                  <TileLayerAny url={tileUrl} attribution="© OpenStreetMap contributors" />
 
-            {/* map */}
-            {isClient ? (
-              <MapContainerAny whenCreated={onMapCreated} center={center} zoom={11} style={{ height: 600, width: "100%" }}>
-                <TileLayerAny url={tileUrl} attribution="© OpenStreetMap contributors" />
+                  {/* risks unclustered */}
+                  {risks.map((r) => (
+                    <CircleMarkerAny key={`risk-${r.id}`} center={[r.lat, r.lng]} radius={10} pathOptions={{ color: "#e11d48", fillColor: "#e11d48", fillOpacity: 0.6 }}>
+                      <PopupAny>
+                        <div className="min-w-[200px] p-1">
+                          <div className="font-bold text-rose-700 text-sm border-b pb-1 mb-1 flex justify-between">{r.village} <span className="text-[10px] bg-rose-100 px-1 rounded pt-0.5">{r.risk_score}</span></div>
+                          <div className="text-xs font-semibold text-slate-700">Level: {r.risk_level}</div>
+                          <div className="text-xs text-slate-600 mt-1 leading-snug">{r.summary}</div>
+                          <div className="text-[10px] text-slate-400 mt-2 text-right italic">Updated: {new Date(r.last_updated).toLocaleTimeString()}</div>
+                        </div>
+                      </PopupAny>
+                    </CircleMarkerAny>
+                  ))}
 
-                {/* risks unclustered */}
-                {risks.map((r) => (
-                  <CircleMarkerAny key={`risk-${r.id}`} center={[r.lat, r.lng]} radius={8} pathOptions={{ color: "#e11d48", fillColor: "#e11d48", fillOpacity: 0.6 }}>
-                    <PopupAny>
-                      <div className="max-w-xs">
-                        <div className="font-semibold">{r.village}</div>
-                        <div className="text-sm">Risk: {r.risk_level} ({r.risk_score})</div>
-                        <div className="text-xs mt-2">{r.summary}</div>
-                        <div className="text-xs text-slate-400 mt-2">Updated: {new Date(r.last_updated).toLocaleString()}</div>
-                      </div>
-                    </PopupAny>
-                  </CircleMarkerAny>
-                ))}
+                  {/* auto-center (latest case) */}
+                  {latestCase && latestCase.extra && latestCase.extra.lat && latestCase.extra.lng && <AutoCenter lat={latestCase.extra.lat} lng={latestCase.extra.lng} />}
+                  {latestCase && !(latestCase.extra && latestCase.extra.lat && latestCase.extra.lng) && <AutoCenter lat={pseudoLocationFromString(latestCase.chid)[0]} lng={pseudoLocationFromString(latestCase.chid)[1]} />}
 
-                {/* auto-center (latest case) */}
-                {latestCase && latestCase.extra && latestCase.extra.lat && latestCase.extra.lng && <AutoCenter lat={latestCase.extra.lat} lng={latestCase.extra.lng} />}
-                {latestCase && !(latestCase.extra && latestCase.extra.lat && latestCase.extra.lng) && <AutoCenter lat={pseudoLocationFromString(latestCase.chid)[0]} lng={pseudoLocationFromString(latestCase.chid)[1]} />}
+                  {/* broadcasts */}
+                  {broadcasts.map((b) => {
+                    const hasGeo = typeof b.lat === "number" && typeof b.lng === "number";
+                    const lat = hasGeo ? (b.lat as number) : null;
+                    const lng = hasGeo ? (b.lng as number) : null;
+                    const color = b.severity === "zyaada" ? "#ef4444" : b.severity === "madhyam" ? "#f59e0b" : "#2563eb";
+                    return (
+                      <React.Fragment key={`bc-${b.id}`}>
+                        {hasGeo && (
+                          <>
+                            <CircleMarkerAny center={[lat!, lng!]} radius={10} pathOptions={{ color, fillColor: color, fillOpacity: 0.7 }}>
+                              <PopupAny>
+                                <div className="min-w-[200px]">
+                                  <div className="font-bold text-sm mb-1">📢 Broadcast ({b.severity})</div>
+                                  <div className="text-sm bg-slate-50 p-2 rounded border">{b.message}</div>
+                                  <div className="text-[10px] text-slate-400 mt-1">{new Date(b.created_at || Date.now()).toLocaleString()}</div>
+                                </div>
+                              </PopupAny>
+                            </CircleMarkerAny>
+                            {b.radius_meters ? (
+                              <CircleAny center={[lat!, lng!]} radius={b.radius_meters} pathOptions={{ color: color, fillColor: color, fillOpacity: 0.08 }} />
+                            ) : null}
+                          </>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
 
-                {/* broadcasts on map: center marker + optional radius */}
-                {broadcasts.map((b) => {
-                  const hasGeo = typeof b.lat === "number" && typeof b.lng === "number";
-                  const lat = hasGeo ? (b.lat as number) : null;
-                  const lng = hasGeo ? (b.lng as number) : null;
-                  const color = b.severity === "zyaada" ? "#ef4444" : b.severity === "madhyam" ? "#f59e0b" : "#2563eb";
-                  return (
-                    <React.Fragment key={`bc-${b.id}`}>
-                      {hasGeo && (
-                        <>
-                          <CircleMarkerAny center={[lat!, lng!]} radius={10} pathOptions={{ color, fillColor: color, fillOpacity: 0.7 }}>
+                  {/* cases */}
+                  {clusterOn ? (
+                    <MarkerClusterGroupAny>
+                      {filteredCases.map((c) => {
+                        const lat = c.extra?.lat ?? pseudoLocationFromString(c.chid)[0];
+                        const lng = c.extra?.lng ?? pseudoLocationFromString(c.chid)[1];
+                        const audio = audioUrlFor(c.audio_path ?? null);
+                        const color = c.severity === "zyaada" ? "#ef4444" : c.severity === "madhyam" ? "#f59e0b" : "#2563eb";
+                        return (
+                          <CircleMarkerAny key={`case-${c.id}`} center={[lat, lng]} radius={8} pathOptions={{ color, fillColor: color, fillOpacity: 0.95 }}>
                             <PopupAny>
-                              <div className="max-w-xs">
-                                <div className="font-semibold">Broadcast ({b.severity ?? "-"})</div>
-                                <div className="text-sm mt-1">{b.message}</div>
-                                <div className="text-xs text-slate-500 mt-2">{new Date(b.created_at || Date.now()).toLocaleString()}</div>
+                              <div className="min-w-[240px] p-1">
+                                <div className="flex justify-between items-center border-b pb-2 mb-2">
+                                    <span className="font-bold text-indigo-700">{c.chid}</span>
+                                    <span className={`text-[10px] px-2 py-0.5 rounded-full text-white uppercase font-bold ${c.severity === "zyaada" ? "bg-red-500" : c.severity === "madhyam" ? "bg-amber-500" : "bg-blue-500"}`}>{c.severity ?? "N/A"}</span>
+                                </div>
+                                <div className="text-sm text-slate-700 mb-2">{c.summary_hindi ?? c.symptoms}</div>
+                                {audio && <div className="mt-2 bg-slate-100 p-2 rounded"><audio className="w-full h-6" controls src={audio} /></div>}
                               </div>
                             </PopupAny>
                           </CircleMarkerAny>
-                          {b.radius_meters ? (
-                            <CircleAny center={[lat!, lng!]} radius={b.radius_meters} pathOptions={{ color: color, fillColor: color, fillOpacity: 0.08 }} />
-                          ) : null}
-                        </>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
+                        );
+                      })}
+                    </MarkerClusterGroupAny>
+                  ) : (
+                    filteredCases.map((c) => {
+                        const lat = c.extra?.lat ?? pseudoLocationFromString(c.chid)[0];
+                        const lng = c.extra?.lng ?? pseudoLocationFromString(c.chid)[1];
+                        const audio = audioUrlFor(c.audio_path ?? null);
+                        const color = c.severity === "zyaada" ? "#ef4444" : c.severity === "madhyam" ? "#f59e0b" : "#2563eb";
+                        return (
+                          <CircleMarkerAny key={`case-${c.id}`} center={[lat, lng]} radius={6} pathOptions={{ color, fillColor: color, fillOpacity: 0.8 }}>
+                            <PopupAny>
+                               <div className="min-w-[240px] p-1">
+                                <div className="flex justify-between items-center border-b pb-2 mb-2">
+                                    <span className="font-bold text-indigo-700">{c.chid}</span>
+                                    <span className={`text-[10px] px-2 py-0.5 rounded-full text-white uppercase font-bold ${c.severity === "zyaada" ? "bg-red-500" : c.severity === "madhyam" ? "bg-amber-500" : "bg-blue-500"}`}>{c.severity ?? "N/A"}</span>
+                                </div>
+                                <div className="text-sm text-slate-700 mb-2">{c.summary_hindi ?? c.symptoms}</div>
+                                {audio && <div className="mt-2 bg-slate-100 p-2 rounded"><audio className="w-full h-6" controls src={audio} /></div>}
+                              </div>
+                            </PopupAny>
+                          </CircleMarkerAny>
+                        );
+                      })
+                  )}
+                </MapContainerAny>
+              ) : (
+                <div className="flex h-full items-center justify-center text-slate-400 bg-slate-100">Map is initializing...</div>
+              )}
 
-                {/* clustered or raw case markers */}
-                {clusterOn ? (
-                  <MarkerClusterGroupAny>
-                    {filteredCases.map((c) => {
-                      const lat = c.extra?.lat ?? pseudoLocationFromString(c.chid)[0];
-                      const lng = c.extra?.lng ?? pseudoLocationFromString(c.chid)[1];
-                      const audio = audioUrlFor(c.audio_path ?? null);
-                      const color = c.severity === "zyaada" ? "#ef4444" : c.severity === "madhyam" ? "#f59e0b" : "#2563eb";
-                      return (
-                        <CircleMarkerAny key={`case-${c.id}`} center={[lat, lng]} radius={7} pathOptions={{ color, fillColor: color, fillOpacity: 0.9 }}>
-                          <PopupAny>
-                            <div className="max-w-xs">
-                              <div className="font-semibold">CHID: {c.chid}</div>
-                              <div className="text-sm mt-1">{c.summary_hindi ?? c.symptoms}</div>
-                              <div className="text-xs text-slate-500 mt-2">Severity: {c.severity ?? "-"}</div>
-                              {audio && <div className="mt-2"><audio controls src={audio} /><div className="mt-1"><a className="text-sm text-indigo-600" href={audio} target="_blank" rel="noreferrer">Open audio</a></div></div>}
-                            </div>
-                          </PopupAny>
-                        </CircleMarkerAny>
-                      );
-                    })}
-                  </MarkerClusterGroupAny>
-                ) : (
-                  filteredCases.map((c) => {
-                    const lat = c.extra?.lat ?? pseudoLocationFromString(c.chid)[0];
-                    const lng = c.extra?.lng ?? pseudoLocationFromString(c.chid)[1];
-                    const audio = audioUrlFor(c.audio_path ?? null);
-                    const color = c.severity === "zyaada" ? "#ef4444" : c.severity === "madhyam" ? "#f59e0b" : "#2563eb";
-                    return (
-                      <CircleMarkerAny key={`case-${c.id}`} center={[lat, lng]} radius={6} pathOptions={{ color, fillColor: color, fillOpacity: 0.8 }}>
-                        <PopupAny>
-                          <div className="max-w-xs">
-                            <div className="font-semibold">CHID: {c.chid}</div>
-                            <div className="text-sm mt-1">{c.summary_hindi ?? c.symptoms}</div>
-                            <div className="text-xs text-slate-500 mt-2">Severity: {c.severity ?? "-"}</div>
-                            {audio && <div className="mt-2"><audio controls src={audio} /><div className="mt-1"><a className="text-sm text-indigo-600" href={audio} target="_blank" rel="noreferrer">Open audio</a></div></div>}
-                          </div>
-                        </PopupAny>
-                      </CircleMarkerAny>
-                    );
-                  })
-                )}
-              </MapContainerAny>
-            ) : (
-              <div className="flex h-full items-center justify-center text-slate-500">Loading map…</div>
-            )}
+              {/* floating play latest */}
+              {showPlayLatest && latestCase?.audio_path && (
+                <div className="absolute right-6 bottom-8 z-[400] animate-in slide-in-from-bottom-4 duration-500">
+                  <button onClick={() => playAudio(audioUrlFor(latestCase.audio_path))} className="pl-4 pr-5 py-3 bg-emerald-600 text-white rounded-full shadow-xl hover:bg-emerald-700 hover:scale-105 transition-all flex items-center gap-2 ring-4 ring-emerald-600/20">
+                    <div className="bg-white text-emerald-600 rounded-full p-1"><Icons.Play /></div>
+                    <span className="font-semibold text-sm">Play Latest Incoming</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
-          <aside className="bg-white rounded shadow p-4">
-            <h3 className="font-semibold mb-2">Legend</h3>
-            <ul className="text-sm space-y-2">
-              <li><span className="inline-block w-3 h-3 bg-[#2563eb] mr-2 align-middle rounded-full" /> Low</li>
-              <li><span className="inline-block w-3 h-3 bg-[#f59e0b] mr-2 align-middle rounded-full" /> Medium</li>
-              <li><span className="inline-block w-3 h-3 bg-[#ef4444] mr-2 align-middle rounded-full" /> High</li>
-              <li><span className="inline-block w-3 h-3 bg-[#e11d48] mr-2 align-middle rounded-full" /> Risk</li>
-              <li><span className="inline-block w-3 h-3 bg-[#9b5cff] mr-2 align-middle rounded-full" /> Broadcast (geo)</li>
-            </ul>
+          {/* Right Column: Sidebar/Feed (Fixed width) */}
+          <aside className="lg:col-span-3 flex flex-col gap-4 h-full overflow-hidden">
+            
+            {/* Chart Widget */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 flex-shrink-0">
+              <div className="flex items-center justify-between mb-2">
+                 <h3 className="text-xs font-bold uppercase text-slate-400 tracking-wider">Trend (24h)</h3>
+                 <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-500">Live</span>
+              </div>
+              {isClient && <RechartsArea data={chartData} />}
+            </div>
 
-            <div className="mt-4">
-              <h4 className="font-medium">Latest broadcasts</h4>
-              <div className="mt-2 space-y-2 max-h-[160px] overflow-auto text-sm">
-                {broadcasts.length === 0 && <div className="text-slate-500">No broadcasts yet</div>}
-                {broadcasts.map((b) => (
-                  <div key={b.id} className={`p-2 rounded border ${b.severity === "zyaada" ? "border-red-500 bg-red-50" : b.severity === "madhyam" ? "border-yellow-500 bg-yellow-50" : "border-slate-300"}`}>
-                    <div className="font-medium">{b.severity ?? "—"} <span className="text-xs text-slate-500 ml-2">{new Date(b.created_at || Date.now()).toLocaleString()}</span></div>
-                    <div className="text-xs text-slate-700 mt-1">{b.message}</div>
-                    {b.lat && b.lng && <div className="text-xs text-slate-500 mt-1">Geo: {b.lat.toFixed(4)},{b.lng.toFixed(4)} {b.radius_meters ? ` | r=${b.radius_meters}m` : ""}</div>}
-                  </div>
-                ))}
+            {/* Legend */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-3 flex-shrink-0">
+              <div className="flex flex-wrap gap-2 text-xs font-medium text-slate-600">
+                 <div className="flex items-center bg-slate-50 px-2 py-1 rounded border border-slate-100"><span className="w-2 h-2 rounded-full bg-[#2563eb] mr-1.5"></span> Low</div>
+                 <div className="flex items-center bg-slate-50 px-2 py-1 rounded border border-slate-100"><span className="w-2 h-2 rounded-full bg-[#f59e0b] mr-1.5"></span> Medium</div>
+                 <div className="flex items-center bg-slate-50 px-2 py-1 rounded border border-slate-100"><span className="w-2 h-2 rounded-full bg-[#ef4444] mr-1.5"></span> High</div>
+                 <div className="flex items-center bg-slate-50 px-2 py-1 rounded border border-slate-100"><span className="w-2 h-2 rounded-full bg-[#e11d48] mr-1.5"></span> Risk Zone</div>
+                 <div className="flex items-center bg-slate-50 px-2 py-1 rounded border border-slate-100"><span className="w-2 h-2 rounded-full bg-[#9b5cff] mr-1.5"></span> Broadcast</div>
               </div>
             </div>
 
-            <div className="mt-4">
-              <h4 className="font-medium mb-2">Latest cases</h4>
-              <div className="mt-2 space-y-2 max-h-[360px] overflow-auto text-sm">
-                {cases.length === 0 && <div className="text-slate-500">No cases yet</div>}
-                {cases.map((c) => (
-                  <div key={c.id} className={`p-2 rounded border ${c.severity === "zyaada" ? "border-red-500 bg-red-50" : c.severity === "madhyam" ? "border-yellow-500 bg-yellow-50" : "border-slate-300"}`}>
-                    <div className="font-medium">{c.chid}</div>
-                    <div className="text-xs text-slate-600">{c.summary_hindi ?? c.symptoms}</div>
-                    <div className="text-xs text-slate-500">{new Date(c.created_at || Date.now()).toLocaleString()}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            {/* Tabbed Feeds Container */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex-1 overflow-hidden flex flex-col min-h-0">
+               
+               {/* Section: Broadcasts */}
+               <div className="flex-shrink-0 p-4 pb-0 border-b border-slate-100 bg-slate-50/50">
+                 <h4 className="font-bold text-sm text-slate-700 mb-2 flex items-center gap-2"><span className="text-rose-500">📢</span> Recent Broadcasts</h4>
+                 <div className="space-y-2 max-h-[140px] overflow-y-auto pr-1 mb-3 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
+                    {broadcasts.length === 0 && <div className="text-xs text-slate-400 text-center py-4 italic">No active broadcasts</div>}
+                    {broadcasts.map((b) => (
+                      <div key={b.id} className={`p-2.5 rounded-lg border text-xs relative pl-3 ${b.severity === "zyaada" ? "border-rose-200 bg-rose-50/50" : b.severity === "madhyam" ? "border-amber-200 bg-amber-50/50" : "border-blue-200 bg-blue-50/50"}`}>
+                         <div className={`absolute left-0 top-2 bottom-2 w-1 rounded-r ${b.severity === "zyaada" ? "bg-rose-400" : b.severity === "madhyam" ? "bg-amber-400" : "bg-blue-400"}`}></div>
+                         <div className="flex justify-between items-start mb-1">
+                           <span className="font-bold uppercase opacity-80 text-[10px]">{b.severity ?? "Info"}</span>
+                           <span className="text-[10px] text-slate-400">{new Date(b.created_at || Date.now()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                         </div>
+                         <div className="text-slate-800 leading-snug font-medium">{b.message}</div>
+                      </div>
+                    ))}
+                 </div>
+               </div>
 
-            <div className="mt-4">
-              <h4 className="font-medium mb-2">Cases (last 24 bins)</h4>
-              <div>
-                {/* Chart renders only on client */}
-                {isClient && <RechartsArea data={chartData} />}
-              </div>
+               {/* Section: Cases */}
+               <div className="flex-1 flex flex-col min-h-0 p-4 pt-3 bg-white">
+                 <h4 className="font-bold text-sm text-slate-700 mb-3 flex items-center gap-2"><span className="text-indigo-500">📋</span> Incoming Cases</h4>
+                 <div className="flex-1 overflow-y-auto pr-1 space-y-2 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
+                    {cases.length === 0 && <div className="text-sm text-slate-400 text-center py-10">Waiting for incoming cases...</div>}
+                    {cases.map((c) => (
+                      <button 
+                        key={c.id} 
+                        onClick={() => panToCase(c)} 
+                        className="w-full text-left p-3 rounded-xl border border-slate-100 bg-white hover:border-indigo-200 hover:shadow-md hover:-translate-y-0.5 transition-all group relative overflow-hidden"
+                      >
+                        {/* Severity Indicator Bar */}
+                        <div className={`absolute left-0 top-0 bottom-0 w-1 ${c.severity === "zyaada" ? "bg-rose-500" : c.severity === "madhyam" ? "bg-amber-400" : "bg-blue-400"}`}></div>
+                        
+                        <div className="pl-2">
+                           <div className="flex justify-between items-start mb-1">
+                             <span className="font-mono font-bold text-xs text-slate-500 group-hover:text-indigo-600 transition-colors">{c.chid}</span>
+                             <span className="text-[10px] font-medium text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded">{new Date(c.created_at || Date.now()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                           </div>
+                           <div className="text-sm font-medium text-slate-800 line-clamp-2 leading-relaxed">{c.summary_hindi ?? c.symptoms}</div>
+                           {c.audio_path && <div className="mt-2 flex items-center gap-1 text-[10px] text-indigo-500 font-semibold"><Icons.Play /> <span>Audio available</span></div>}
+                        </div>
+                      </button>
+                    ))}
+                 </div>
+               </div>
+
             </div>
           </aside>
-        </div>
 
-        {/* floating play latest */}
-        {showPlayLatest && latestCase?.audio_path && (
-          <div className="fixed right-6 bottom-6 z-50">
-            <button onClick={() => playAudio(audioUrlFor(latestCase.audio_path))} className="px-4 py-2 bg-emerald-600 text-white rounded shadow-lg hover:bg-emerald-700">Play latest audio</button>
-          </div>
-        )}
+        </div>
       </div>
     </div>
   );
